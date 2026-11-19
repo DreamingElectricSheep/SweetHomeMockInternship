@@ -125,6 +125,7 @@ import com.eteks.sweethome3d.viewcontroller.View;
 public class FurnitureTable extends JTable implements View, Printable {
   private static final String EXPANDED_ROWS_VISUAL_PROPERTY = "com.eteks.sweethome3d.SweetHome3D.ExpandedGroups";
 
+  private Home                   home;
   private UserPreferences        preferences;
   private ListSelectionListener  tableSelectionListener;
   private boolean                selectionByUser;
@@ -147,6 +148,7 @@ public class FurnitureTable extends JTable implements View, Printable {
    */
   public FurnitureTable(Home home, UserPreferences preferences, 
                        FurnitureController controller) {
+    this.home = home;
     this.preferences = preferences;
     float resolutionScale = SwingTools.getResolutionScale();
     if (resolutionScale != 1) {
@@ -750,8 +752,12 @@ public class FurnitureTable extends JTable implements View, Printable {
           return headerRendererLabel;
         }
       };
+    boolean levelColumnPrinted = false;
     for (int columnIndex = 0, n = columnModel.getColumnCount(); columnIndex < n; columnIndex++) {
       final TableColumn tableColumn = columnModel.getColumn(columnIndex);
+      if (HomePieceOfFurniture.SortableProperty.LEVEL.equals(tableColumn.getIdentifier())) {
+        levelColumnPrinted = true;
+      }
       // Create a printable column from existing table column
       TableColumn printableColumn = new TableColumn();
       printableColumn.setIdentifier(tableColumn.getIdentifier());
@@ -779,7 +785,37 @@ public class FurnitureTable extends JTable implements View, Printable {
       printableColumn.setHeaderRenderer(printableHeaderRenderer);
       printableColumnModel.addColumn(printableColumn);
     }    
+    // Add a Level column when printing a multi-level home, without changing
+    // the visible properties of the table displayed on screen.
+    if (!levelColumnPrinted
+        && columnModel instanceof FurnitureTableColumnModel
+        && hasMultipleViewableLevels()) {
+      TableColumn levelColumn = ((FurnitureTableColumnModel)columnModel).availableColumns.get(
+          HomePieceOfFurniture.SortableProperty.LEVEL);
+      if (levelColumn != null) {
+        TableColumn printableLevelColumn = new TableColumn();
+        printableLevelColumn.setIdentifier(levelColumn.getIdentifier());
+        printableLevelColumn.setHeaderValue(levelColumn.getHeaderValue());
+        printableLevelColumn.setPreferredWidth(levelColumn.getPreferredWidth());
+        printableLevelColumn.setCellRenderer(levelColumn.getCellRenderer());
+        printableLevelColumn.setHeaderRenderer(printableHeaderRenderer);
+        printableColumnModel.addColumn(printableLevelColumn);
+      }
+    }
     return print(g, pageFormat, pageIndex, printableColumnModel, Color.BLACK);
+  }
+
+  /**
+   * Returns <code>true</code> if the home displayed by this table has more than one viewable level.
+   */
+  private boolean hasMultipleViewableLevels() {
+    int viewableLevelCount = 0;
+    for (Level level : this.home.getLevels()) {
+      if (level.isViewable()) {
+        viewableLevelCount++;
+      }
+    }
+    return viewableLevelCount > 1;
   }
 
   /**
